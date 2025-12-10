@@ -1,0 +1,125 @@
+name: Update Cask
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to (e.g., v0.1.0). Leave empty to fetch latest.'
+        required: false
+        type: string
+  repository_dispatch:
+    types: [update-cask]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Determine version
+        id: version
+        run: |
+          # Use provided version or fetch latest
+          VERSION="${{ inputs.version || github.event.client_payload.version }}"
+
+          if [ -z "$VERSION" ]; then
+            echo "Fetching latest version..."
+            VERSION_JSON=$(curl -sL https://api.miren.cloud/assets/release/miren/latest/version.json)
+            VERSION=$(echo "$VERSION_JSON" | jq -r '.version')
+          fi
+
+          # Strip 'v' prefix for cask version if present
+          VERSION_NUM="${VERSION#v}"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_num=$VERSION_NUM" >> $GITHUB_OUTPUT
+          echo "Updating to version: $VERSION (cask version: $VERSION_NUM)"
+
+      - name: Fetch checksums
+        id: checksums
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Fetching version.json for $VERSION..."
+
+          VERSION_JSON=$(curl -sL "https://api.miren.cloud/assets/release/miren/${VERSION}/version.json")
+
+          if [ -z "$VERSION_JSON" ] || [ "$VERSION_JSON" = "null" ]; then
+            echo "Error: Could not fetch version.json for $VERSION"
+            exit 1
+          fi
+
+          echo "Version JSON:"
+          echo "$VERSION_JSON" | jq .
+
+          # Extract checksums for all platform/arch combinations
+          # macOS
+          DARWIN_ARM64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="darwin" and .arch=="arm64") | .sha256')
+          DARWIN_AMD64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="darwin" and .arch=="amd64") | .sha256')
+          # Linux
+          LINUX_ARM64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="linux" and .arch=="arm64") | .sha256')
+          LINUX_AMD64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="linux" and .arch=="amd64") | .sha256')
+
+          echo "darwin_arm64=$DARWIN_ARM64" >> $GITHUB_OUTPUT
+          echo "darwin_amd64=$DARWIN_AMD64" >> $GITHUB_OUTPUT
+          echo "linux_arm64=$LINUX_ARM64" >> $GITHUB_OUTPUT
+          echo "linux_amd64=$LINUX_AMD64" >> $GITHUB_OUTPUT
+
+      - name: Update cask
+        run: |
+          VERSION_NUM="${{ steps.version.outputs.version_num }}"
+          DARWIN_ARM64="${{ steps.checksums.outputs.darwin_arm64 }}"
+          DARWIN_AMD64="${{ steps.checksums.outputs.darwin_amd64 }}"
+          LINUX_ARM64="${{ steps.checksums.outputs.linux_arm64 }}"
+          LINUX_AMD64="${{ steps.checksums.outputs.linux_amd64 }}"
+
+          cat > Casks/miren.rb << EOF
+          cask "miren" do
+            arch arm: "arm64", intel: "amd64"
+            os macos: "darwin", linux: "linux"
+
+            version "$VERSION_NUM"
+            sha256 arm:          "$DARWIN_ARM64",
+                   intel:        "$DARWIN_AMD64",
+                   arm64_linux:  "$LINUX_ARM64",
+                   x86_64_linux: "$LINUX_AMD64"
+
+            url "https://api.miren.cloud/assets/release/miren/v#{version}/miren-#{os}-#{arch}.zip"
+            name "Miren"
+            desc "Application deployment CLI for Miren Runtime"
+            homepage "https://miren.dev"
+
+            livecheck do
+              url "https://api.miren.cloud/assets/release/miren/latest/version.json"
+              regex(/"version"\s*:\s*"v?(\d+(?:\.\d+)+)"/i)
+            end
+
+            binary "miren"
+          end
+          EOF
+
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' Casks/miren.rb
+
+          echo "Updated cask:"
+          cat Casks/miren.rb
+
+      - name: Commit and push
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Casks/miren.rb
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit - cask is already up to date"
+            exit 0
+          fi
+
+          git commit -m "Update miren to $VERSION"
+          git push
