@@ -55,12 +55,13 @@ jobs:
           echo "$VERSION_JSON" | jq .
 
           # Extract checksums for all platform/arch combinations
+          # Filter by name pattern "miren-{os}-{arch}.zip" to avoid matching "miren-base-*" artifacts
           # macOS
-          DARWIN_ARM64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="darwin" and .arch=="arm64") | .sha256')
-          DARWIN_AMD64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="darwin" and .arch=="amd64") | .sha256')
+          DARWIN_ARM64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.name=="miren-darwin-arm64.zip") | .sha256')
+          DARWIN_AMD64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.name=="miren-darwin-amd64.zip") | .sha256')
           # Linux
-          LINUX_ARM64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="linux" and .arch=="arm64") | .sha256')
-          LINUX_AMD64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.platform=="linux" and .arch=="amd64") | .sha256')
+          LINUX_ARM64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.name=="miren-linux-arm64.zip") | .sha256')
+          LINUX_AMD64=$(echo "$VERSION_JSON" | jq -r '.artifacts[] | select(.name=="miren-linux-amd64.zip") | .sha256')
 
           echo "darwin_arm64=$DARWIN_ARM64" >> $GITHUB_OUTPUT
           echo "darwin_amd64=$DARWIN_AMD64" >> $GITHUB_OUTPUT
