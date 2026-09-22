@@ -2,11 +2,11 @@ cask "miren" do
   arch arm: "arm64", intel: "amd64"
   os macos: "darwin", linux: "linux"
 
-  version "0.15.2"
-  sha256 arm:          "2930643802e06001cec4ce4f69c0b1ca752b6d388815ac4715157598f0200382",
-         intel:        "000902078a05a0927f1bfa1c33d91c967e963c1da30beea24b06fbabb67399c7",
-         arm64_linux:  "76889003b4871014bcb5bc538c56c345a770880b0b152dc7c4f47755708df7a0",
-         x86_64_linux: "31c28da62604d6ee9cc78a4888f726de3505b712917adef8437856e0885dc5eb"
+  version "0.16.0"
+  sha256 arm:          "b9e881f775a1f02a837cae97dc252e52bc9047d64d9670a003837f41997bdf01",
+         intel:        "ea5352dc11454221be90ffcb0ef53960978b6dedb10c741191b6434637a0576e",
+         arm64_linux:  "890ad100323a759e36853b87370122ab5e682c468ae897e4d651fb8c1cb2225e",
+         x86_64_linux: "44bd41b8ac095449d80c686fd96fdf8af33bd5e05c29c430892faf8e6145d25b"
 
   url "https://api.miren.cloud/assets/release/miren/v#{version}/miren-#{os}-#{arch}.zip"
   name "Miren"
